@@ -49,7 +49,7 @@
 			background-color: #222;
 			bottom: 0;
 			width: 100vw;
-			height: 74px;
+			height: 94px;
 			display: flex;
 			align-items: center;
 			text-transform: uppercase;
@@ -66,6 +66,12 @@
 			margin-right: 12px;
 		}
 
+		.menubar label {
+			display: block;
+			font-size: 10px;
+			margin-left: 4px;
+			margin-bottom: 6px;
+		}
 		.menubar input {
 			background-color: #333;
 			border: 1px solid #444;
@@ -75,7 +81,7 @@
 			color: #999;
 			padding-left: 24px;
 			font-size: 16px;
-			padding-top: 4px;
+			padding-top: 2px;
 			padding-bottom: 0px;
 		}
 	</style>
@@ -103,9 +109,12 @@
 		<div class="text-infos">
 			iteration : <span class="iter_curr">--</span> <br />
 			time taken (train) : <span class="time_taken">--</span> s <br />
-			time taken (+ display): <span class="time_taken_display">--</span> s
+			time taken (+ display): <span class="time_taken_display">--</span> s<br />
+			theta 0 : <span class="theta_0">--</span><br />
+			theta 1 : <span class="theta_1">--</span>
 		</div>
 		<div class="">
+			<label>Iterations max</label>
 			<input 
 				ype="number" 
 				class="inputIterationsMax" 
@@ -115,6 +124,7 @@
 				onchange="handleChange(event)"/>
 		</div>
 		<div class="">
+			<label>Précision</label>
 			<input 
 				type="number" 
 				class="inputPrecision" 
@@ -124,6 +134,7 @@
 				onchange="handleChange(event)"/>
 		</div>
 		<div class="">
+			<label>Learning rate</label>
 			<input 
 				type="number" 
 				class="inputLearningRate" 
@@ -160,7 +171,9 @@
 		inputLearningRate 	= null,
 		spanIterations 		= null,
 		spanTimeTaken		= null,
-		spanTimeDisplay		= null
+		spanTimeDisplay		= null,
+		spanTheta0			= null,
+		spanTheta1			= null
 	
 	let startTime			= 0
 
@@ -258,9 +271,17 @@
 	}
 
 	const displayChartData = (data) => {
+
 		chartData.data.datasets[0] = {
 			label: 'Scatter',
-			data: [...data].map(v => ({x: v[0], y: v[1]})),
+			data: [...data].map((v, k) => {
+				if (len > 200000) {
+					if (k % 300 === 0)
+						return {x: v[0], y: v[1]}
+				} else {
+					return {x: v[0], y: v[1]}
+				}
+			}),
 			backgroundColor: "#775dd0aa",
 			type: "scatter"
 		}
@@ -272,6 +293,9 @@
 		console.clear()
 
 		spanTimeTaken.innerHTML = "-- "
+		spanTheta0.innerHTML 	= "--"
+		spanTheta1.innerHTML 	= "--"
+
 		startTime = new Date().getTime()
 
 		chartData.data.datasets = [defaultLineScale]
@@ -297,10 +321,12 @@
 
 		const text 	= await readDragAndDrop(event)
 
-		data 		= text.split("\n").map(v => v.split(","))
+		data 		= text.split("\n")
+		if (data[0].includes(";")) data = data.map(v => v.split(";"))
+		else data = data.map(v => v.split(","))
+
 		dataTitle 	= [data[0][0], data[0][1]]
 		data 		= data.slice(1, data.length - 1)
-
 
 		console.log(data.length)
 		len		= data.length * 1.0
@@ -373,6 +399,8 @@
 		spanIterations 		= document.querySelector(".iter_curr")
 		spanTimeTaken 		= document.querySelector(".time_taken")
 		spanTimeDisplay 	= document.querySelector(".time_taken_display")
+		spanTheta0			= document.querySelector(".theta_0")
+		spanTheta1			= document.querySelector(".theta_1")
 
 		inputIterations 	= document.querySelector(".inputIterationsMax")
 		inputPrecision 		= document.querySelector(".inputPrecision")
@@ -396,7 +424,7 @@
 
 
 
-				if (e.data.i < 100 || e.data.i % 500 === 0) {
+				if (e.data.i < 100 || e.data.i % 400 === 0) {
 
 						chartLine.data.datasets.push ( {
 							label: ' ',
@@ -421,11 +449,9 @@
 			}
 			if (e.data.action === "DONE") {
 				const { thetas } = e.data
-				console.log(min, max)
-				console.log("DONE ", e.data.thetas)
-				console.log(mseHistory)
-
-				console.log(precisionHistory)
+		
+				spanTheta0.innerHTML = e.data.thetas[0]
+				spanTheta1.innerHTML = e.data.thetas[1]
 
 				chartPrecision.data.datasets.push ({
 					label: ' ',
@@ -502,6 +528,7 @@
 				}
 
 				chartLine.update()
+				spanTimeDisplay.innerHTML = ((new Date().getTime() - startTime) / 1000)
 
 			}
 		}, false)
