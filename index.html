@@ -13,17 +13,43 @@
 			justify-content: center;
 			align-items: center;
 			font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif
-
+		}
+		.chartData {
+			position: absolute;
+			top: 0;
+			left: 0;
+			display: block;
 		}
 	</style>
+	<script type="text/javascript" src="https://livejs.com/live.js"></script>
+	<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
 </html>
 
 
 <div id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
 	drag file here
+	<div class="chartData">
+		<!-- <canvas id="chart1" width="200px" height="200px"></canvas> -->
+
+		<canvas id="chartData" width="600" height="600"></canvas>
+	</div>
+
+	<div style="display:block; margin-top: 45px">
+		Iterations : <span class="iter_curr">0</span> / <span class="iter_total">0</span>
+	</div>
 </div>
 
+
 <script>
+	let chartData 		= null,
+		worker 			= null,
+		spanIterations 	= null,
+		max				= [-Infinity, -Infinity],
+        min				= [Infinity, Infinity],
+		iterations 		= 2000,
+		learning_rate 	= 0.1
+
+
 	const readDragAndDrop = async (event) => {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
@@ -36,26 +62,151 @@
 			reader.readAsText(event.dataTransfer.files[0]); 
 		})
 	}
+	
+	const initChartData = () => {
+		const ctx = document.getElementById('chartData').getContext('2d');
+		chartData = new Chart(ctx, {
+			type: 'scatter',
+			data: {
+			datasets: [[], []]
+			},
+			options: {
+				animation: {
+					duration: 0
+				},
+				hover: {
+					animationDuration: 0
+				},
+				responsiveAnimationDuration: 0,
+				scales: {
+					xAxes: [{
+						type: 'linear',
+						position: 'bottom'
+					}]
+				}
+			}
+		});
+	}
+
+	const displayChartData = (data) => {
+		chartData.data.datasets[0] = {
+			label: 'Scatter',
+			data: [...data].map(v => ({x: v[0], y: v[1]})),
+			type: "scatter"
+		}
+		chartData.update()
+	}
 
 	async function dropHandler(event) {
 		event.preventDefault()
 		console.clear()
 
+		chartData.data.datasets = []
+		max	= [-Infinity, -Infinity]
+        min	= [Infinity, Infinity]
+
 		let data,
 			dataTitle
 
-		const text = await readDragAndDrop(event)
+		const text 	= await readDragAndDrop(event)
+
 		data 		= text.split("\n").map(v => v.split(","))
 		dataTitle 	= [data[0][0], data[0][1]]
-		data 		= data.slice(1, data.length)
+		data 		= data.slice(1, data.length - 1)
 
-		console.log(dataTitle, data)
+
+		console.log(data.length)
+		let len		= data.length * 1.0
+
+		for (const c of data) {
+            min[0] = Math.min(min[0], c[0])
+            max[0] = Math.max(max[0], c[0])
+            min[1] = Math.min(min[1], c[1])
+            max[1] = Math.max(max[1], c[1])
+        }
+
+    	data = data.map(v => ([
+            (v[0] - min[0]) / (max[0] - min[0]),
+            (v[1] - min[1]) / (max[1] - min[1]),
+        ]))
+
+		displayChartData(data)
+		worker.postMessage({action: "START", iterations, learning_rate, data, len})
 	}
 
 
 	function dragOverHandler(event) {
 		event.preventDefault()
 	}
+	
 
+	const denorm = (value, min, max) => {
+		return value * (max - min) + min
+	}
+
+	const norm = (value, min, max) => {
+		return (value - min) / (max - min)
+	}
+
+	;(function () {
+		initChartData()
+		worker = new Worker("train.js")
+
+		document.querySelector(".iter_total").innerHTML = iterations 
+		spanIterations = document.querySelector(".iter_curr")
+
+		worker.addEventListener('message', async function(e) {
+			// if (e.data.action === "THETAS") {
+			// 		if (e.data.i % 500 === 0) {
+			// 			chartData.data.datasets[1] = {
+			// 				label: ' ',
+			// 				data: [
+			// 					{
+			// 						x: 0, 
+			// 						y: e.data.thetas[0]
+			// 					}, 
+			// 					{
+			// 						x: 1, 
+			// 						y: e.data.thetas[0] + e.data.thetas[1]
+			// 					}],
+								
+			// 				borderColor: "#ff00ff",
+			// 				type: "line",
+			// 				fill: false
+			// 			}
+
+			// 			chartData.update()
+			// 		}
+			
+
+			// }
+
+			if (e.data.action === "ITERATION") {
+				spanIterations.innerHTML = e.data.i + 1
+			}
+			if (e.data.action === "DONE") {
+				const { thetas } = e.data
+				console.log(min, max)
+
+				chartData.data.datasets[1] = {
+					label: ' ',
+					data: [
+						{
+							x: 0, 
+							y: thetas[0]
+						}, 
+						{
+							x: 1, 
+							y: thetas[0] + thetas[1]
+						}],
+						
+					borderColor: "#ff0000",
+					type: "line",
+					fill: false
+				}
+
+				chartData.update()
+			}
+		}, false)
+	})()
 </script>
-<script type="text/javascript" src="https://livejs.com/live.js"></script>
