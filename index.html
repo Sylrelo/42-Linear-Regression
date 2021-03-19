@@ -20,6 +20,19 @@
 			left: 0;
 			display: block;
 		}
+		.container {
+			position: relative;
+		}
+
+		#chartData {
+		}
+		#chartLine {
+			position: absolute;
+			top: 0;
+			left: 0;
+
+		}
+
 	</style>
 	<script type="text/javascript" src="https://livejs.com/live.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
@@ -30,8 +43,10 @@
 	drag file here
 	<div class="chartData">
 		<!-- <canvas id="chart1" width="200px" height="200px"></canvas> -->
-
-		<canvas id="chartData" width="600" height="600"></canvas>
+		<div class="container">
+			<canvas id="chartData" width="800" height="480"></canvas>
+			<canvas id="chartLine" width="800" height="480"></canvas>
+		</div>
 	</div>
 
 	<div style="display:block; margin-top: 45px">
@@ -42,6 +57,7 @@
 
 <script>
 	let chartData 		= null,
+		chartLine 		= null,
 		worker 			= null,
 		spanIterations 	= null,
 		max				= [-Infinity, -Infinity],
@@ -49,6 +65,22 @@
 		iterations 		= 2000,
 		learning_rate 	= 0.1
 
+	const defaultLineScale = {
+						data: [
+							{
+								x: 1,
+								y: 0
+							}, 
+							{
+								x: 0,
+								y: 1
+							}
+						],
+
+						label: 'e',
+						borderColor: "#00000011",
+						fill: false
+					}
 
 	const readDragAndDrop = async (event) => {
 		return new Promise((resolve, reject) => {
@@ -64,13 +96,14 @@
 	}
 	
 	const initChartData = () => {
-		const ctx = document.getElementById('chartData').getContext('2d');
-		chartData = new Chart(ctx, {
-			type: 'scatter',
-			data: {
-			datasets: [[], []]
-			},
+		const ctx 	= document.getElementById('chartData').getContext('2d'),
+			ctxLine = document.getElementById('chartLine').getContext('2d');
+
+		const sharedOptions = {
 			options: {
+				legend: {
+					display: false
+				},
 				animation: {
 					duration: 0
 				},
@@ -85,6 +118,22 @@
 					}]
 				}
 			}
+		}
+		chartLine = new Chart(ctxLine, {
+			type: 'line',
+			data: {
+				datasets: [defaultLineScale]
+			},
+			...sharedOptions
+		});
+		chartLine.update()
+
+		chartData = new Chart(ctx, {
+			type: 'scatter',
+			data: {
+				datasets: [[], []]
+			},
+			...sharedOptions
 		});
 	}
 
@@ -92,6 +141,7 @@
 		chartData.data.datasets[0] = {
 			label: 'Scatter',
 			data: [...data].map(v => ({x: v[0], y: v[1]})),
+			backgroundColor: "#00000055",
 			type: "scatter"
 		}
 		chartData.update()
@@ -101,7 +151,8 @@
 		event.preventDefault()
 		console.clear()
 
-		chartData.data.datasets = []
+		chartData.data.datasets = [defaultLineScale]
+		chartLine.data.datasets = [defaultLineScale]
 		max	= [-Infinity, -Infinity]
         min	= [Infinity, Infinity]
 
@@ -156,33 +207,30 @@
 		spanIterations = document.querySelector(".iter_curr")
 
 		worker.addEventListener('message', async function(e) {
-			// if (e.data.action === "THETAS") {
-			// 		if (e.data.i % 500 === 0) {
-			// 			chartData.data.datasets[1] = {
-			// 				label: ' ',
-			// 				data: [
-			// 					{
-			// 						x: 0, 
-			// 						y: e.data.thetas[0]
-			// 					}, 
-			// 					{
-			// 						x: 1, 
-			// 						y: e.data.thetas[0] + e.data.thetas[1]
-			// 					}],
-								
-			// 				borderColor: "#ff00ff",
-			// 				type: "line",
-			// 				fill: false
-			// 			}
-
-			// 			chartData.update()
-			// 		}
-			
-
-			// }
-
 			if (e.data.action === "ITERATION") {
 				spanIterations.innerHTML = e.data.i + 1
+
+				if (e.data.i < 50 || e.data.i % 100 === 0) {
+						chartLine.data.datasets.push ( {
+							label: ' ',
+							data: [
+								{
+									x: 0, 
+									y: e.data.thetas[0]
+								}, 
+								{
+									x: 1, 
+									y: e.data.thetas[0] + e.data.thetas[1]
+								}],
+								
+							borderColor: "#0000ff33",
+							type: "line",
+							fill: false
+						})
+
+						chartLine.update()
+					}
+
 			}
 			if (e.data.action === "DONE") {
 				const { thetas } = e.data
@@ -206,6 +254,26 @@
 				}
 
 				chartData.update()
+
+				chartLine.data.datasets[1] = {
+					label: ' ',
+					data: [
+						{
+							x: 0, 
+							y: thetas[0]
+						}, 
+						{
+							x: 1, 
+							y: thetas[0] + thetas[1]
+						}],
+						
+					borderColor: "#ff0000",
+					type: "line",
+					fill: false
+				}
+
+				chartLine.update()
+
 			}
 		}, false)
 	})()

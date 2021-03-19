@@ -20,7 +20,6 @@ const train 	= (data) => {
 
 	for ( i = 0; i < data.iterations ; i++ ) {
 		self.postMessage({action: "ITERATION", i, thetas})
-		//self.postMessage({action: "THETAS", i, thetas})
 		thetas = derive(data.data, thetas, data.learning_rate)
 
 	}
@@ -37,5 +36,3 @@ self.onmessage 	= function(e) {
 			break;
 	}
 }
-
-// t0 + t1 * v
