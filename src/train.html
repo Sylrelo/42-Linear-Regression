@@ -1,98 +1,15 @@
 <html>
 	<title>Linear Regression</title>
-	<style>
-		body {
-			margin: 0px;
-			padding: 0px;
-			background: #111;
-			color: #aaa
-		}
-		#drop_zone {
-			width: 100%;
-			height: 100%;
-			display: flex;
-			justify-content: center;
-			align-items: center;
-			font-family:'Gill Sans', 'Gill Sans MT', Calibri, 'Trebuchet MS', sans-serif
-		}
-		.chartData {
-			position: absolute;
-			top: 0;
-			left: 0;
-			display: block;
-		}
-		.container {
-			position: relative;
-			width: 100vw;
-		}
-
-		#chartData {
-			width: 100vw;
-
-		}
-		#chartLine {
-			width: 100vw;
-			position: absolute;
-			top: 0;
-			left: 0;
-		}
-		.secondary {
-			display: flex;
-		}
-		#chartPrecision, #chartMSE {
-			width: 49%;
-			height: 200px;
-		}
-
-		.menubar {
-			position: absolute;
-			background-color: #222;
-			bottom: 0;
-			width: 100vw;
-			height: 94px;
-			display: flex;
-			align-items: center;
-			text-transform: uppercase;
-			font-size: 14px;
-		}
-
-		.menubar .text-infos > span {
-			font-weight: bold;
-		}
-
-		.menubar div {
-			width: 100%;
-			margin-left: 12px;
-			margin-right: 12px;
-		}
-
-		.menubar label {
-			display: block;
-			font-size: 10px;
-			margin-left: 4px;
-			margin-bottom: 6px;
-		}
-		.menubar input {
-			background-color: #333;
-			border: 1px solid #444;
-			border-radius: 5px;
-			height: 32px;
-			width: 100%;
-			color: #999;
-			padding-left: 24px;
-			font-size: 16px;
-			padding-top: 2px;
-			padding-bottom: 0px;
-		}
-	</style>
+	<link rel="stylesheet" href=".styles.css">
 	<script type="text/javascript" src="https://livejs.com/live.js"></script>
 	<script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+	<script src="worker_train.js"></script>
+	<script src="charts.js"></script>
 </html>
 
 
 <div id="drop_zone" ondrop="dropHandler(event);" ondragover="dragOverHandler(event);">
 	<div class="chartData">
-		<!-- <canvas id="chart1" width="200px" height="200px"></canvas> -->
 		<div class="container">
 			<canvas id="chartData" height="480"></canvas>
 			<canvas id="chartLine" height="480"></canvas>
@@ -177,24 +94,6 @@
 	
 	let startTime			= 0
 
-
-	const defaultLineScale = {
-						data: [
-							{
-								x: 1,
-								y: 0
-							}, 
-							{
-								x: 0,
-								y: 1
-							}
-						],
-
-						label: 'e',
-						borderColor: "#00000011",
-						fill: false
-					}
-
 	const readDragAndDrop = async (event) => {
 		return new Promise((resolve, reject) => {
 			const reader = new FileReader();
@@ -208,67 +107,6 @@
 		})
 	}
 	
-	const initChartData = () => {
-		const ctx 	= document.getElementById('chartData').getContext('2d'),
-			ctxLine = document.getElementById('chartLine').getContext('2d'),
-			ctxPrecision = document.getElementById('chartPrecision').getContext('2d'),
-			ctxMSE = document.getElementById('chartMSE').getContext('2d')
-
-		const sharedOptions = {
-			options: {
-				responsive: false,
-				maintainAspectRatio: false,
-				legend: {
-					display: false
-				},
-				animation: {
-					duration: 0
-				},
-				hover: {
-					animationDuration: 0
-				},
-				responsiveAnimationDuration: 0,
-				scales: {
-					xAxes: [{
-						type: 'linear',
-						position: 'bottom'
-					}]
-				}
-			}
-		}
-
-		chartPrecision = new Chart(ctxPrecision, {
-			type: 'line',
-			data: {
-				datasets: []
-			},
-			...sharedOptions
-		});
-
-		chartMSE = new Chart(ctxMSE, {
-			type: 'line',
-			data: {
-				datasets: []
-			},
-			...sharedOptions
-		});
-
-		chartLine = new Chart(ctxLine, {
-			type: 'line',
-			data: {
-				datasets: [defaultLineScale]
-			},
-			...sharedOptions
-		});
-
-		chartData = new Chart(ctx, {
-			type: 'scatter',
-			data: {
-				datasets: [[], []]
-			},
-			...sharedOptions
-		});
-	}
 
 	const displayChartData = (data) => {
 
@@ -290,18 +128,26 @@
 
 	async function dropHandler(event) {
 		event.preventDefault()
-		console.clear()
 
-		spanTimeTaken.innerHTML = "-- "
-		spanTheta0.innerHTML 	= "--"
-		spanTheta1.innerHTML 	= "--"
+		let data,
+			dataTitle
 
-		startTime = new Date().getTime()
+		startTime						= new Date().getTime()
 
-		chartData.data.datasets = [defaultLineScale]
-		chartLine.data.datasets = [defaultLineScale]
-		chartPrecision.data.datasets = []
-		chartMSE.data.datasets = [
+		spanTimeTaken.innerHTML 		= "-- "
+		spanTheta0.innerHTML 			= "--"
+		spanTheta1.innerHTML 			= "--"
+
+		precisionHistory 				= []
+		mseHistory 						= []
+
+		max								= [-Infinity, -Infinity]
+        min								= [Infinity, Infinity]
+
+		chartData.data.datasets 		= [defaultLineScale]
+		chartLine.data.datasets 		= [defaultLineScale]
+		chartPrecision.data.datasets	= []
+		chartMSE.data.datasets 			= [
 			{
 				label: ' ',
 				data: [],
@@ -313,23 +159,17 @@
 		chartPrecision.update()
 		chartMSE.update()
 
-		max	= [-Infinity, -Infinity]
-        min	= [Infinity, Infinity]
 
-		let data,
-			dataTitle
 
 		const text 	= await readDragAndDrop(event)
-
 		data 		= text.split("\n")
+
 		if (data[0].includes(";")) data = data.map(v => v.split(";"))
 		else data = data.map(v => v.split(","))
 
 		dataTitle 	= [data[0][0], data[0][1]]
 		data 		= data.slice(1, data.length - 1)
-
-		console.log(data.length)
-		len		= data.length * 1.0
+		len			= data.length * 1.0
 
 		for (const c of data) {
             min[0] = Math.min(min[0], c[0])
@@ -344,9 +184,15 @@
         ]))
 
 		displayChartData(data)
-		worker.postMessage({action: "START", iterations, learning_rate, precision, data, len})
+		worker.postMessage({
+			action: "START", 
+			iterations, 
+			learning_rate, 
+			precision, 
+			data, 
+			len
+		})
 	}
-
 
 	function dragOverHandler(event) {
 		event.preventDefault()
@@ -367,7 +213,6 @@
 			chartMSE.update()
 		}
 	}
-
 
 	const handleChange = (event) => {
 		const { target } = event
@@ -391,61 +236,71 @@
 		}
 	}
 
+	const initWebWorker = () => {
+		try {
+			worker = new Worker("worker_train.js")
+			console.log("Worker created.")
+		} catch(error) {
+			console.log("Using worker workaround.")
+			try {
+				// Workaround très moche pour Chrome et l'utilisation de Worker sans serveur
+				const blob = new Blob( [`(${worker_train.toString()})()`], { type: 'text/javascript' })
+				worker = new Worker( URL.createObjectURL(blob) )
+				console.log("Worker created.")
+			} catch(error) {
+				console.error("Cannot start worker.")
+				alert("Cannot start worker. Try another way.")
+			}
+		}
+	}
+
 	;(function () {
 		initChartData()
-		worker = new Worker("train.js")
+		initWebWorker()
 
-		//document.querySelector(".iter_total").innerHTML = iterations 
 		spanIterations 		= document.querySelector(".iter_curr")
 		spanTimeTaken 		= document.querySelector(".time_taken")
 		spanTimeDisplay 	= document.querySelector(".time_taken_display")
 		spanTheta0			= document.querySelector(".theta_0")
 		spanTheta1			= document.querySelector(".theta_1")
-
 		inputIterations 	= document.querySelector(".inputIterationsMax")
 		inputPrecision 		= document.querySelector(".inputPrecision")
 		inputLearningRate 	= document.querySelector(".inputLearningRate")
-
 
 		inputIterations.value 	= iterations
 		inputLearningRate.value = learning_rate
 		inputPrecision.value 	= precision
 
 		worker.addEventListener('message', async function(e) {
-			if (e.data.action === "ITERATION") {
-				precisionHistory.push(e.data.precision)
-				mseHistory.push(e.data.mse)
+			switch (e.data.action) {
+				case "ITERATION":
+					precisionHistory.push(e.data.precision)
+					mseHistory.push(e.data.mse)
 
+					spanIterations.innerHTML 	= (e.data.i + 1).toLocaleString("fr")
+					spanTimeDisplay.innerHTML 	= ((new Date().getTime() - startTime) / 1000)
+					pushMSE(e.data.mse, e.data.i)
 
-
-				spanIterations.innerHTML = (e.data.i + 1).toLocaleString("fr")
-				spanTimeDisplay.innerHTML = ((new Date().getTime() - startTime) / 1000)
-				pushMSE(e.data.mse, e.data.i)
-
-
-
-				if (e.data.i < 100 || e.data.i % 400 === 0) {
-
+					if (e.data.i < 100 || e.data.i % 400 === 0) {
 						chartLine.data.datasets.push ( {
 							label: ' ',
-							data: [
-								{
-									x: 0, 
-									y: e.data.thetas[0]
-								}, 
-								{
-									x: 1, 
-									y: e.data.thetas[0] + e.data.thetas[1]
-								}],
-								
+							data: [ 
+								{ x: 0,  y: e.data.thetas[0] },  
+								{ x: 1,  y: e.data.thetas[0] + e.data.thetas[1] }
+							],
 							borderColor: "#008FFB33",
 							type: "line",
 							fill: false
 						})
-
 						chartLine.update()
 					}
+				break;
 
+				case "DONE": 
+					break;
+				
+				default:
+					break;
 			}
 			if (e.data.action === "DONE") {
 				const { thetas } = e.data
@@ -456,79 +311,37 @@
 				chartPrecision.data.datasets.push ({
 					label: ' ',
 					data: [...precisionHistory].slice(0, e.data.iteration * 0.25).map((v, k) => ({y: v[1] + v[0], x: k})),
-						
 					borderColor: "#feb01955",
 					fill: false
 				})
-
 				chartPrecision.data.datasets.push ({
 					label: ' ',
 					data: [...precisionHistory].slice(0, e.data.iteration * 0.25).map((v, k) => ({y: ((v[0]) ), x: k})),
-						
 					borderColor: "#775dd055",
 					fill: false
 				})
 				chartPrecision.data.datasets.push ({
 					label: ' ',
 					data: [...precisionHistory].slice(0, e.data.iteration * 0.25).map((v, k) => ({y: (( v[1])), x: k})),
-						
 					borderColor: "#008ffb55",
 					fill: false
 				})
-
-
 				chartPrecision.update()
 
-				spanTimeTaken.innerHTML = (e.data.time_taken / 1000)
-
-				// chartMSE.data.datasets.push ({
-				// 	label: ' ',
-				// 	data: [...mseHistory].slice(0, e.data.iteration * 0.25).map((v, k) => ({y: v, x: k})),
-						
-				// 	borderColor: "#ff0000",
-				// 	fill: false
-				// })
-				// chartMSE.update()
-
-
-				chartData.data.datasets[1] = {
+				chartLine.data.datasets[0] = {
 					label: ' ',
-					data: [
-						{
-							x: 0, 
-							y: thetas[0]
-						}, 
-						{
-							x: 1, 
-							y: thetas[0] + thetas[1]
-						}],
-						
-					borderColor: "#ff0000",
-					type: "line",
-					fill: false
-				}
-
-				chartData.update()
-
-				chartLine.data.datasets[1] = {
-					label: ' ',
-					data: [
-						{
-							x: 0, 
-							y: thetas[0]
-						}, 
-						{
-							x: 1, 
-							y: thetas[0] + thetas[1]
-						}],
-						
+					data: [ 
+						{ x: 0,  y: thetas[0] },  
+						{ x: 1,  y: thetas[0] + thetas[1] }
+					],
 					borderColor: "#ff4560",
 					type: "line",
-					fill: false
+					fill: true
 				}
-
 				chartLine.update()
+
 				spanTimeDisplay.innerHTML = ((new Date().getTime() - startTime) / 1000)
+				spanTimeTaken.innerHTML = (e.data.time_taken / 1000)
 
 			}
 		}, false)
