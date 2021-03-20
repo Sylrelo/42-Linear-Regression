@@ -15,7 +15,7 @@ const worker_train = () => {
 				thetas[0] - learning_rate * m * der[0],
 				thetas[1] - learning_rate * m * der[1]
 			],
-			mse
+			mse: mse * m
 		}
 	}
 
