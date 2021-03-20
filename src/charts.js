@@ -4,7 +4,7 @@ const defaultLineScale = {
 		{ x: 0, y: 1 }
 	],
 	label: " ",
-	borderColor: "#ff000055",
+	borderColor: "#ff00ff55",
 	fill: false
 }
 

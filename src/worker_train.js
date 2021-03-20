@@ -1,5 +1,5 @@
 const worker_train = () => {
-	const derive = (data, thetas, learning_rate) => {
+	const derivemse = (data, thetas, learning_rate) => {
 		let der = [0.0, 0.0],
 			mse = 0.0,
 			m = 1 / data.length
@@ -31,13 +31,13 @@ const worker_train = () => {
 			diff = [0.0, 0.0]
 
 		for (i = 0; i < data.iterations; i++) {
-			ret = derive(data.data, prev_thetas, data.learning_rate)
+			ret = derivemse(data.data, prev_thetas, data.learning_rate)
 			diff = [
 				Math.abs(prev_thetas[0] - ret.thetas[0]),
 				Math.abs(prev_thetas[1] - ret.thetas[1])
 			]
 			if ((diff[0] + diff[1]) * 0.5 < data.precision) {
-				thetas = ret
+				thetas = ret.thetas
 				break
 			}
 			prev_thetas = ret.thetas
